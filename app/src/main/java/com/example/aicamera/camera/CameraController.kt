@@ -115,68 +115,99 @@ class CameraController(private val context: Context) {
      * 拍照
      *
      * @param executor 执行拍照操作的线程（通常使用 MainExecutor）
-     * @param callback 拍照完成回调，返回照片 Bitmap
+     * @param onBitmapReady 拍照完成回调，返回照片 Bitmap
+     *
+     * 扩展点：此处可在获得 Bitmap 后发送给后端 AI 服务进行实时分析
      */
     fun takePicture(
         executor: Executor,
-        callback: (Bitmap?) -> Unit
+        onBitmapReady: (Bitmap?) -> Unit
     ) {
         val imageCapture = imageCapture ?: run {
             Log.w(TAG, "ImageCapture 未初始化")
-            callback(null)
+            onBitmapReady(null)
             return
         }
 
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(
-            context.cacheDir
-        ).build()
-
+        // 使用内存中的 ImageCapture，而不是文件
+        // 这样可以直接获取 Bitmap，避免文件读取问题
         imageCapture.takePicture(
-            outputOptions,
             executor,
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: androidx.camera.core.ImageProxy) {
                     try {
-                        val savedUri = outputFileResults.savedUri
-                        if (savedUri != null) {
-                            val bitmap = loadBitmapFromFile(savedUri.path ?: return)
-                            callback(bitmap)
-                        } else {
-                            callback(null)
-                        }
+                        // 将 ImageProxy 转换为 Bitmap
+                        val bitmap = imageProxyToBitmap(image)
+                        image.close() // 立即释放 ImageProxy 资源
+                        onBitmapReady(bitmap)
                     } catch (e: Exception) {
-                        Log.e(TAG, "处理拍照结果失败", e)
-                        callback(null)
+                        Log.e(TAG, "转换图像失败", e)
+                        image.close()
+                        onBitmapReady(null)
                     }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.e(TAG, "拍照失败", exception)
                     onCameraError?.invoke("拍照失败：${exception.message}")
-                    callback(null)
+                    onBitmapReady(null)
                 }
             }
         )
     }
 
     /**
-     * 从文件路径加载 Bitmap
+     * 将 ImageProxy 转换为 Bitmap
      *
-     * @param filePath 文件路径
-     * @return 加载的 Bitmap，失败返回 null
+     * @param image ImageProxy 对象
+     * @return 转换后的 Bitmap
      */
-    private fun loadBitmapFromFile(filePath: String): Bitmap? {
-        return try {
-            val file = java.io.File(filePath)
-            if (file.exists()) {
-                android.graphics.BitmapFactory.decodeFile(filePath)
-            } else {
-                null
-            }
+    private fun imageProxyToBitmap(image: androidx.camera.core.ImageProxy): Bitmap {
+        val planes = image.planes
+        val width = image.width
+        val height = image.height
+
+        // 处理 NV21 格式的图像数据
+        val buffer = planes[0].buffer
+        buffer.rewind()
+
+        // 创建字节数组并复制缓冲区数据
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+
+        // 使用 BitmapFactory 解码字节数据
+        val bitmap = try {
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } catch (e: Exception) {
-            Log.e(TAG, "加载图片失败", e)
-            null
+            Log.e(TAG, "BitmapFactory 解码失败，使用备用方案", e)
+            // 备用方案：直接创建位图
+            android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
         }
+
+        // 处理相机旋转（竖屏适配）
+        val rotationDegrees = image.imageInfo.rotationDegrees
+        return if (rotationDegrees != 0) {
+            rotateBitmap(bitmap, rotationDegrees)
+        } else {
+            bitmap
+        }
+    }
+
+    /**
+     * 旋转 Bitmap
+     *
+     * @param bitmap 原始位图
+     * @param degrees 旋转角度
+     * @return 旋转后的位图
+     */
+    private fun rotateBitmap(bitmap: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return bitmap
+
+        val matrix = android.graphics.Matrix()
+        matrix.postRotate(degrees.toFloat())
+        return android.graphics.Bitmap.createBitmap(
+            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+        )
     }
 
     /**

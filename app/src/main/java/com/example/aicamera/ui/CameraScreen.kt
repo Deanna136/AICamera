@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +33,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
 import com.example.aicamera.R
 import com.google.android.material.snackbar.Snackbar
+import android.view.ViewGroup
 
 /**
  * 相机页面 UI
@@ -52,11 +54,16 @@ fun CameraScreen(
     val errorMessage = viewModel.errorMessage.collectAsState().value
     val aiAdvice = viewModel.aiAdvice.collectAsState().value
     val voiceGuideEnabled = viewModel.voiceGuideEnabled.collectAsState().value
+    val context = LocalContext.current
 
     // 处理错误消息
     LaunchedEffect(errorMessage) {
         if (!errorMessage.isNullOrEmpty()) {
-            // TODO: 显示错误提示（可使用 Snackbar 或 Toast）
+            // 显示 Snackbar 错误提示
+            val rootView = (context as? android.app.Activity)?.window?.decorView?.findViewById<ViewGroup>(android.R.id.content)
+            if (rootView != null) {
+                Snackbar.make(rootView, errorMessage, Snackbar.LENGTH_LONG).show()
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -17,7 +18,7 @@ import java.util.Locale
  *
  * 特点：
  * - 遵循 Android 10+ Scoped Storage（分区存储）规范
- * - 无需 WRITE_EXTERNAL_STORAGE 权限
+ * - 无需 WRITE_EXTERNAL_STORAGE 权限（仅在 Android 12+ 需要对 Pictures 目录的权限）
  * - 保存后自动刷新相册
  *
  * 扩展点：
@@ -25,6 +26,10 @@ import java.util.Locale
  * - 可添加本地缓存管理（清理过期照片等）
  */
 class FileManager(private val context: Context) {
+
+    companion object {
+        private const val TAG = "FileManager"
+    }
 
     /**
      * 保存照片到系统相册（使用 MediaStore API）
@@ -45,7 +50,10 @@ class FileManager(private val context: Context) {
                 put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
                 put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/AiCamera")
-                put(MediaStore.Images.Media.IS_PENDING, 1)
+                // 在 Android 11+ 上需要设置 IS_PENDING
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
             }
 
             // 插入到 MediaStore
@@ -53,25 +61,43 @@ class FileManager(private val context: Context) {
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 contentValues
             ) ?: run {
+                Log.e(TAG, "无法向 MediaStore 插入图像 URI")
                 return@withContext null
             }
 
+            Log.d(TAG, "成功创建 MediaStore URI: $uri")
+
             // 写入位图数据
-            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream)
-            } ?: run {
+            val outputStream = contentResolver.openOutputStream(uri)
+            if (outputStream != null) {
+                outputStream.use { stream ->
+                    val compressed = bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+                    if (!compressed) {
+                        Log.w(TAG, "位图压缩失败")
+                        contentResolver.delete(uri, null, null)
+                        return@withContext null
+                    }
+                }
+            } else {
+                Log.e(TAG, "无法打开输出流")
                 contentResolver.delete(uri, null, null)
                 return@withContext null
             }
 
             // 完成写入，更新 IS_PENDING 标志
-            contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-            contentResolver.update(uri, contentValues, null, null)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                val updated = contentResolver.update(uri, contentValues, null, null)
+                if (updated <= 0) {
+                    Log.w(TAG, "更新 IS_PENDING 标志失败，但继续处理")
+                }
+            }
 
+            Log.d(TAG, "照片成功保存到相册: $uri")
             // 返回文件路径或 URI 字符串
             uri.toString()
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "保存照片异常", e)
             null
         }
     }

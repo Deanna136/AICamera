@@ -34,8 +34,8 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            // 相机权限已授予，初始化相机
-            viewModel.initializeCamera(this, androidx.camera.view.PreviewView(this))
+            // 相机权限已授予，继续请求其他权限
+            checkAndRequestPermissions()
         } else {
             // 相机权限被拒绝
             viewModel.clearError()
@@ -45,7 +45,19 @@ class MainActivity : AppCompatActivity() {
     private val galleryPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        // 相册权限处理（当前暂不使用）
+        // 相册读取权限处理
+        if (isGranted) {
+            checkAndRequestPermissions()
+        }
+    }
+
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // 存储写入权限处理（Android 12+）
+        if (isGranted) {
+            checkAndRequestPermissions()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,6 +71,7 @@ class MainActivity : AppCompatActivity() {
         // 注册权限请求启动器
         permissionManager.registerCameraPermissionLauncher(cameraPermissionLauncher)
         permissionManager.registerGalleryPermissionLauncher(galleryPermissionLauncher)
+        permissionManager.registerStoragePermissionLauncher(storagePermissionLauncher)
 
         // 使用 Compose 设置 UI
         setContent {
@@ -76,23 +89,22 @@ class MainActivity : AppCompatActivity() {
      * 检查和请求必需的权限
      */
     private fun checkAndRequestPermissions() {
-        val requiredPermissions = mutableListOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.READ_MEDIA_IMAGES
-        )
-
         // 检查是否所有权限都已授予
-        val allPermissionsGranted = requiredPermissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
+        val allPermissionsGranted = permissionManager.hasCameraPermission() &&
+            permissionManager.hasGalleryPermission() &&
+            permissionManager.hasStoragePermission()
 
         if (allPermissionsGranted) {
             // 所有权限已授予，初始化相机
-            // (注：需要在 UI 初始化后调用，这里通过 ViewModel 中的初始化逻辑处理)
+            viewModel.initializeCamera(this, androidx.camera.view.PreviewView(this))
         } else {
-            // 请求相机权限（其他权限可按需添加）
+            // 按顺序请求缺失的权限
             if (!permissionManager.hasCameraPermission()) {
                 permissionManager.requestCameraPermission()
+            } else if (!permissionManager.hasGalleryPermission()) {
+                permissionManager.requestGalleryPermission()
+            } else if (!permissionManager.hasStoragePermission()) {
+                permissionManager.requestStoragePermission()
             }
         }
     }

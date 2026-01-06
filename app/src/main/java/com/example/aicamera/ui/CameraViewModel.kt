@@ -2,6 +2,7 @@ package com.example.aicamera.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aicamera.camera.CameraController
@@ -21,6 +22,10 @@ import kotlinx.coroutines.launch
  * - 预留 AI 相关数据存储和回调
  */
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        private const val TAG = "CameraViewModel"
+    }
 
     // 依赖注入
     val cameraController = CameraController(application)
@@ -131,22 +136,30 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value = CameraUIState.Saving
 
             try {
+                Log.d(TAG, "开始保存照片，Bitmap 尺寸: ${bitmap.width}x${bitmap.height}")
+
                 // 检查存储空间
                 if (!fileManager.hasEnoughStorage()) {
+                    Log.e(TAG, "存储空间不足")
                     _errorMessage.value = "存储空间不足"
                     _uiState.value = CameraUIState.Ready
                     return@launch
                 }
 
+                Log.d(TAG, "存储空间充足，开始保存到相册...")
+
                 // 保存到相册
                 val result = fileManager.saveBitmapToGallery(bitmap)
                 if (result != null) {
+                    Log.d(TAG, "照片成功保存，URI: $result")
                     _uiState.value = CameraUIState.PhotoSaved
                 } else {
+                    Log.e(TAG, "照片保存失败")
                     _errorMessage.value = "照片保存失败"
                     _uiState.value = CameraUIState.Ready
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "保存异常", e)
                 _errorMessage.value = "保存异常：${e.message}"
                 _uiState.value = CameraUIState.Ready
             }
