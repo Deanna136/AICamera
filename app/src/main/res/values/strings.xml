@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">AiCamera</string>
+
+    <!-- 相机相关 -->
+    <string name="camera_permission_denied">需要相机权限才能使用此功能</string>
+    <string name="camera_permission_request">请授予相机权限</string>
+    <string name="camera_not_available">设备不支持相机功能</string>
+    <string name="camera_initialization_error">相机初始化失败</string>
+
+    <!-- 拍照按钮 -->
+    <string name="take_photo">拍照</string>
+    <string name="photo_taken">照片已保存</string>
+    <string name="photo_save_error">照片保存失败</string>
+
+    <!-- AI功能占位文本 -->
+    <string name="ai_suggestion">AI建议</string>
+    <string name="voice_guide_toggle">语音引导</string>
+    <string name="no_suggestion">暂无建议</string>
+
+    <!-- 通用 -->
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="retry">重试</string>
+    <string name="error">错误</string>
+</resources>
