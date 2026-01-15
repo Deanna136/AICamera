@@ -12,6 +12,14 @@
     <string name="photo_taken">照片已保存</string>
     <string name="photo_save_error">照片保存失败</string>
 
+    <!-- 相机控制 -->
+    <string name="switch_camera">切换摄像头</string>
+    <string name="zoom_in">放大</string>
+    <string name="zoom_out">缩小</string>
+    <string name="reset_zoom">重置</string>
+    <string name="focus">点击对焦</string>
+    <string name="zoom_value">变焦: %.1fx</string>
+
     <!-- AI功能占位文本 -->
     <string name="ai_suggestion">AI建议</string>
     <string name="voice_guide_toggle">语音引导</string>

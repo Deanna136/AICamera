@@ -60,6 +60,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // 录音权限处理
+        if (isGranted) {
+            checkAndRequestPermissions()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -72,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         permissionManager.registerCameraPermissionLauncher(cameraPermissionLauncher)
         permissionManager.registerGalleryPermissionLauncher(galleryPermissionLauncher)
         permissionManager.registerStoragePermissionLauncher(storagePermissionLauncher)
+        permissionManager.registerAudioPermissionLauncher(audioPermissionLauncher)
 
         // 使用 Compose 设置 UI
         setContent {
@@ -92,7 +102,8 @@ class MainActivity : AppCompatActivity() {
         // 检查是否所有权限都已授予
         val allPermissionsGranted = permissionManager.hasCameraPermission() &&
             permissionManager.hasGalleryPermission() &&
-            permissionManager.hasStoragePermission()
+            permissionManager.hasStoragePermission() &&
+            permissionManager.hasAudioPermission()
 
         if (allPermissionsGranted) {
             // 所有权限已授予，初始化相机
@@ -105,6 +116,8 @@ class MainActivity : AppCompatActivity() {
                 permissionManager.requestGalleryPermission()
             } else if (!permissionManager.hasStoragePermission()) {
                 permissionManager.requestStoragePermission()
+            } else if (!permissionManager.hasAudioPermission()) {
+                permissionManager.requestAudioPermission()
             }
         }
     }
